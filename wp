@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# WP-CLI Docker Wrapper
+# Executes WP-CLI commands against WordPress running in Docker container
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Get the directory where this script is located (should be project root)
+PROJECT_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Change to the project root directory to ensure docker-compose finds its file
+cd "${PROJECT_ROOT_DIR}" || exit
+
+# Check if .env file exists (required for docker-compose)
+if [ ! -f ".env" ]; then
+  echo -e "${RED}❌ .env file not found in '${PROJECT_ROOT_DIR}'.${NC}"
+  echo -e "${RED}   Please run './setup.sh' first to generate the .env file and configure the environment.${NC}"
+  exit 1
+fi
+
+# Check if Docker is running
+if ! docker info >/dev/null 2>&1; then
+  echo -e "${RED}❌ Docker is not running. Please start Docker first.${NC}"
+  exit 1
+fi
+
+# Check if containers are running
+if ! docker-compose ps | grep -q "wordpress.*Up"; then
+  echo -e "${YELLOW}⚠️  WordPress containers not running. Starting them...${NC}"
+  docker-compose up -d
+  echo -e "${GREEN}✅ Waiting for WordPress to be ready...${NC}"
+  sleep 10
+fi
+
+# Execute WP-CLI command in the wpcli container
+echo -e "${GREEN}🔧 Running WP-CLI:${NC} wp $*"
+docker-compose exec -T wpcli wp "$@" --allow-root
